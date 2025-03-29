@@ -3,54 +3,258 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Гра в Telegram</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https://telegram.org; connect-src 'self' https://telegram.org;">
+    <title>⚔️ Битва</title>
     <style>
         body {
             font-family: Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: white;
+            margin: 0;
+            padding: 10px;
             text-align: center;
-            background-color: #f4f4f4;
-            padding: 20px;
         }
         .container {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
             max-width: 400px;
-            margin: auto;
+            margin: 0 auto;
         }
-        .avatar {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            border: 3px solid #007bff;
+        .health-bar {
+            height: 20px;
+            background-color: #333;
+            border-radius: 10px;
+            margin: 10px 0;
+            overflow: hidden;
         }
-        .btn {
-            display: block;
+        .health-fill {
+            height: 100%;
+            background-color: #4CAF50;
             width: 100%;
-            padding: 10px;
-            margin-top: 10px;
-            background: #007bff;
+            transition: width 0.3s;
+        }
+        .enemy .health-fill {
+            background-color: #f44336;
+        }
+        button {
+            background-color: #007bff;
             color: white;
             border: none;
+            padding: 10px 15px;
+            margin: 5px;
             border-radius: 5px;
             cursor: pointer;
+            font-size: 16px;
+        }
+        button:disabled {
+            background-color: #555;
+            cursor: not-allowed;
+        }
+        .battle-log {
+            background-color: #333;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 10px 0;
+            max-height: 150px;
+            overflow-y: auto;
+            text-align: left;
+        }
+        .log-entry {
+            margin: 5px 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>Ваш персонаж</h2>
-        <img src="https://via.placeholder.com/100" alt="Avatar" class="avatar">
-        <p><strong>Рівень:</strong> 1</p>
-        <p><strong>XP:</strong> 0/100</p>
-        <button class="btn" onclick="levelUp()">🔼 Прокачати рівень</button>
+        <h1>⚔️ Битва</h1>
+        
+        <!-- Гравець -->
+        <h2>Гравець</h2>
+        <p>Рівень: <span id="player-level">1</span></p>
+        <div class="health-bar">
+            <div id="player-health" class="health-fill" style="width: 100%;"></div>
+        </div>
+        
+        <!-- Ворог -->
+        <h2>Ворог</h2>
+        <p>Тип: <span id="enemy-type">Слабак</span></p>
+        <div class="health-bar enemy">
+            <div id="enemy-health" class="health-fill" style="width: 100%;"></div>
+        </div>
+        
+        <!-- Кнопки дій -->
+        <div>
+            <button id="attack-btn">Атакувати</button>
+            <button id="special-btn">Спец.атака</button>
+            <button id="heal-btn">Лікування</button>
+        </div>
+        
+        <!-- Лог битви -->
+        <div class="battle-log" id="battle-log">
+            <div class="log-entry">Битва почалася!</div>
+        </div>
     </div>
 
     <script>
-        function levelUp() {
-            alert("Рівень підвищено! (Скоро буде взаємодія з ботом)");
+        // Ігрові змінні
+        const player = {
+            level: 1,
+            maxHealth: 100,
+            health: 100,
+            attack: 10,
+            specialAttack: 25,
+            healAmount: 15
+        };
+        
+        const enemies = [
+            { name: "Слабак", maxHealth: 30, attack: 5 },
+            { name: "Воїн", maxHealth: 50, attack: 10 },
+            { name: "Бос", maxHealth: 100, attack: 15 }
+        ];
+        
+        let currentEnemy = {...enemies[0], health: enemies[0].maxHealth};
+        let isPlayerTurn = true;
+        
+        // DOM елементи
+        const attackBtn = document.getElementById('attack-btn');
+        const specialBtn = document.getElementById('special-btn');
+        const healBtn = document.getElementById('heal-btn');
+        const battleLog = document.getElementById('battle-log');
+        
+        // Оновлення інтерфейсу
+        function updateUI() {
+            document.getElementById('player-level').textContent = player.level;
+            document.getElementById('player-health').style.width = `${(player.health / player.maxHealth) * 100}%`;
+            document.getElementById('enemy-health').style.width = `${(currentEnemy.health / currentEnemy.maxHealth) * 100}%`;
+            document.getElementById('enemy-type').textContent = currentEnemy.name;
+            
+            attackBtn.disabled = !isPlayerTurn;
+            specialBtn.disabled = !isPlayerTurn;
+            healBtn.disabled = !isPlayerTurn;
         }
+        
+        // Додавання запису до логу
+        function addLog(message) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = message;
+            battleLog.appendChild(entry);
+            battleLog.scrollTop = battleLog.scrollHeight;
+        }
+        
+        // Атака гравця
+        function playerAttack(isSpecial = false) {
+            if (!isPlayerTurn) return;
+            
+            const damage = isSpecial ? player.specialAttack : player.attack;
+            currentEnemy.health -= damage;
+            
+            addLog(`Ви атакували ворога і нанесли ${damage} шкоди!`);
+            
+            if (currentEnemy.health <= 0) {
+                currentEnemy.health = 0;
+                addLog(`Ви перемогли ${currentEnemy.name}!`);
+                setTimeout(nextEnemy, 1500);
+            } else {
+                isPlayerTurn = false;
+                setTimeout(enemyTurn, 1000);
+            }
+            
+            updateUI();
+        }
+        
+        // Хід ворога
+        function enemyTurn() {
+            const damage = Math.floor(currentEnemy.attack * (0.8 + Math.random() * 0.4));
+            player.health -= damage;
+            
+            addLog(`${currentEnemy.name} атакував вас і наніс ${damage} шкоди!`);
+            
+            if (player.health <= 0) {
+                player.health = 0;
+                addLog("Ви програли! Гра закінчена.");
+                endGame();
+            } else {
+                isPlayerTurn = true;
+            }
+            
+            updateUI();
+        }
+        
+        // Лікування
+        function playerHeal() {
+            if (!isPlayerTurn) return;
+            
+            player.health = Math.min(player.health + player.healAmount, player.maxHealth);
+            addLog(`Ви вилікували себе на ${player.healAmount} HP!`);
+            
+            isPlayerTurn = false;
+            updateUI();
+            setTimeout(enemyTurn, 1000);
+        }
+        
+        // Наступний ворог
+        function nextEnemy() {
+            player.level++;
+            
+            // Визначаємо складність ворога
+            let enemyIndex = 0;
+            if (player.level > 5) enemyIndex = 2;
+            else if (player.level > 2) enemyIndex = 1;
+            
+            currentEnemy = {...enemies[enemyIndex], health: enemies[enemyIndex].maxHealth};
+            isPlayerTurn = true;
+            
+            addLog(`Новий рівень ${player.level}! З'являється ${currentEnemy.name}.`);
+            updateUI();
+        }
+        
+        // Кінець гри
+        function endGame() {
+            attackBtn.disabled = true;
+            specialBtn.disabled = true;
+            healBtn.disabled = true;
+            
+            setTimeout(() => {
+                if (confirm("Гра закінчена. Почати знову?")) {
+                    resetGame();
+                }
+            }, 500);
+        }
+        
+        // Скидання гри
+        function resetGame() {
+            player.level = 1;
+            player.health = player.maxHealth;
+            currentEnemy = {...enemies[0], health: enemies[0].maxHealth};
+            isPlayerTurn = true;
+            
+            battleLog.innerHTML = '<div class="log-entry">Битва почалася!</div>';
+            updateUI();
+        }
+        
+        // Ініціалізація Telegram WebApp
+        function initTelegram() {
+            if (window.Telegram && Telegram.WebApp) {
+                Telegram.WebApp.ready();
+                Telegram.WebApp.expand();
+                
+                // Відправка даних назад у бота при завершенні гри
+                Telegram.WebApp.onEvent('gameOver', (data) => {
+                    Telegram.WebApp.sendData(JSON.stringify({
+                        action: 'game_result',
+                        level: player.level
+                    }));
+                });
+            }
+        }
+        
+        // Обробники кнопок
+        attackBtn.addEventListener('click', () => playerAttack(false));
+        specialBtn.addEventListener('click', () => playerAttack(true));
+        healBtn.addEventListener('click', playerHeal);
+        
+        // Запуск гри
+        initTelegram();
+        updateUI();
     </script>
 </body>
 </html>
